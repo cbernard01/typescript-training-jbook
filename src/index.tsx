@@ -1,78 +1,26 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import ReactDOM from "react-dom";
-import * as esbuild from "esbuild-wasm";
-import { unpkgPathPlugin } from "./plugins/unpkg-path-plugin";
-import { fetchPlugin } from "./plugins/fetch-plugin";
+
 import CodeEditor from "./components/code-editor";
+import Preview from "./components/preview";
+import bundle from "./bundler";
+
 import "bulmaswatch/superhero/bulmaswatch.min.css";
 
 const App = () => {
-  const ref = useRef<any>();
-  const iframeRef = useRef<any>();
-
   const [input, setInput] = useState("");
-
-  const startService = async () => {
-    ref.current = await esbuild.startService({
-      worker: true,
-      wasmURL: "https://unpkg.com/esbuild-wasm@0.8.27/esbuild.wasm",
-    });
-  };
+  const [code, setCode] = useState("");
 
   const onClickHandler = async () => {
-    if (!ref.current) return;
+    const output = await bundle(input);
 
-    iframeRef.current.srcdoc = html;
-
-    const result = await ref.current.build({
-      entryPoints: ["index.js"],
-      bundle: true,
-      write: false,
-      plugins: [unpkgPathPlugin(), fetchPlugin(input)],
-      define: { "process.env.NODE_ENV": '"production"', global: "window" },
-    });
-
-    iframeRef.current.contentWindow.postMessage(
-      result.outputFiles[0].text,
-      "*"
-    );
+    setCode(output);
   };
-
-  useEffect(() => {
-    startService().then();
-  }, []);
-
-  const html = `
-  <html lang="en">
-    <head>
-      <title>"Test"</title>
-    </head>
-    <body>
-      <div id="root"></div>
-      <script>
-        window.addEventListener('message', (event) => {
-          try {
-            eval(event.data);
-          } catch (error) {
-            const root = document.querySelector('#root');
-            root.innerHTML = '<div style="color: red;"> <h4>Runtime Error</h4>' + error + '</div>'
-            console.error(error);
-          }
-        }, false);
-      </script>
-    </body>
-  </html>
-  `;
 
   return (
     <div>
       <CodeEditor initialValue={""} onChange={(value) => setInput(value)} />
-      <textarea
-        rows={20}
-        cols={100}
-        value={input}
-        onChange={(e) => setInput(e.target.value)}
-      />
+
       <div>
         <button
           className={"button button-format is-primary is-small"}
@@ -82,12 +30,7 @@ const App = () => {
         </button>
       </div>
 
-      <iframe
-        ref={iframeRef}
-        srcDoc={html}
-        title={"preview"}
-        sandbox={"allow-scripts"}
-      />
+      <Preview code={code} />
     </div>
   );
 };
